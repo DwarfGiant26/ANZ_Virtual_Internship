@@ -97,7 +97,7 @@ First let's see the range of our date data
 sprintf("Earliest Record = %s",min(data$date))
 sprintf("Latest Record = %s",max(data$date))
 ```
-So, now we know that we have 2 months worth of data. Since the range of date is not really that big, let's see the transaction rate everyday in table
+So, now we know that we have around 3 months worth of data. Since the range of date is not really that big, let's see the transaction rate everyday in table
 ```{r}
 transaction_rate_day = data%>%
   filter(!is.na(date))%>%
@@ -116,8 +116,22 @@ transaction_rate_day %>%
          )+
   geom_hline(aes(yintercept=mean(n),colour = "Average"))+
   geom_hline(aes(yintercept=median(n),colour= "Median"))+
-  geom_hline(colour="purple",aes(yintercept=quantile(transaction_rate_day$n, c(0.025))))+
-  geom_hline(colour="purple",aes(yintercept=quantile(transaction_rate_day$n, c(0.975))))
+  geom_hline(aes(yintercept=quantile(transaction_rate_day$n, c(0.025)),colour="upper bound of 95% confidence interval"))+
+  geom_hline(aes(yintercept=quantile(transaction_rate_day$n, c(0.975)),colour="lower bound of 95% confidence interval"))+
+  scale_y_continuous(
+    breaks = sort(
+      c(
+        seq(
+          min(transaction_rate_day$n), 
+          max(transaction_rate_day$n), 
+          length.out=6), 
+        mean(transaction_rate_day$n),
+        median(transaction_rate_day$n),
+        quantile(transaction_rate_day$n, c(0.025))[[1]],
+        quantile(transaction_rate_day$n, c(0.975))[[1]]
+      )
+    )
+  )
   
 ```
-It seems like the transaction 
+It seems like the number of transactions fluctuate quite a lot between 100 and 160 with an average of around 132, and median around 136 transaction per day. 
