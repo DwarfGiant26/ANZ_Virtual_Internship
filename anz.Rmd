@@ -1,0 +1,123 @@
+---
+title: "anz"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+```
+
+```{r cars}
+data = read_excel('ANZ synthesised transaction dataset.xlsx')
+head(data)
+```
+```{r}
+str(data)
+```
+### As we can see there are quite a lot of null values, especially in column merchant_code and bpay_biller_code
+### There are multiple ways we can resolve this:
+### 1. Drop all rows with null value -> this is the easiest but it will get rid of most of the data
+### 2. Drop all rows with null value in columns that has something to do with merchant code/id/etc -> This is a pretty good solution, but some of our query for this data might not really need this part
+### 3. Keep everything, and if we need to query column that has something to do with merchant then we drop it -> i personally think this is the best way as we don't get rid of data when not needed
+
+
+# Questions
+## 1. What are the distributions of the country of all our transactions?
+```{r}
+new_data = data[!is.na(data$merchant_state),] %>%
+  group_by(merchant_state) %>%
+  summarize(total = n()) 
+new_data[order(desc(new_data$total)),] 
+```
+As we can see above the distribution of the transactions recorded does not spread evenly. We can further see the discrepancy between state by plotting it
+
+```{r}
+new_data %>%
+  ggplot(aes(reorder(merchant_state,-total),total,fill=total))+
+  geom_bar(stat='identity')+
+  labs(
+    x="Merchant State",
+    y="Number of Transaction"
+  )
+```
+So what does this means? This means there are a lot more room for improvement for state like TAS,ACT,NT, and SA 
+
+## 2. What is the distribution of balance for each transaction?
+
+```{r}
+balance_plot = data %>%
+  filter(!is.na(balance))%>%
+  ggplot(aes(balance)) +
+  geom_density()+
+  geom_vline(aes(xintercept=mean(balance)),color="blue",linetype="dashed")
+balance_plot
+```
+Just like expected, it looks really skewed towards the right side.
+But I am curious on what does it looks like if we zoom in on the plot where most transaction are inside it.
+Let's see it zoomed in
+
+```{r}
+balance_plot+
+  xlim(0,20000)+
+  geom_vline(aes(xintercept = density(data$balance)$x[which.max(density(data$balance)$y)]))
+```
+From the graph above, it looks like most of our transaction has balance around
+```{r}
+density(data$balance)$x[which.max(density(data$balance)$y)]
+```
+## 3. What is the distribution of the merchant, how many transaction each merchant has in average?
+
+Let's create table with merchant id on 1 column and number of transaction of that merchant in another column
+```{r}
+merchant_trans = data %>%
+  filter(!is.na(merchant_id))%>%
+  group_by(merchant_id)%>%
+  summarise(num_of_transaction = n())
+merchant_trans
+```
+At a glimpse, it looks like a lot of merchant only have 1 transaction, but to better understand this, let's plot the distribution out with histogram
+
+```{r}
+merchant_trans %>%
+  ggplot(aes(num_of_transaction))+
+  geom_bar()+
+  scale_x_continuous(breaks=0:10)
+```
+So our guess was correct!! There are a lot more merchant with 1 transaction. At a glance, this distribution of number of transaction looks like poisson distribution.
+
+## What is ANZ transaction rate over time looks like? Does it have positive, negative, or neutral trend?
+
+First let's see the range of our date data
+```{r}
+sprintf("Earliest Record = %s",min(data$date))
+sprintf("Latest Record = %s",max(data$date))
+```
+So, now we know that we have 2 months worth of data. Since the range of date is not really that big, let's see the transaction rate everyday in table
+```{r}
+transaction_rate_day = data%>%
+  filter(!is.na(date))%>%
+  count(date)
+transaction_rate_day
+```
+Let's plot this out
+
+```{r}
+transaction_rate_day %>%
+  ggplot(aes(date,n))+
+  geom_path(colour="red")+
+  labs(
+    x = "Date",
+    y = "Number of Transactions"
+         )+
+  geom_hline(aes(yintercept=mean(n),colour = "Average"))+
+  geom_hline(aes(yintercept=median(n),colour= "Median"))+
+  geom_hline(colour="purple",aes(yintercept=quantile(transaction_rate_day$n, c(0.025))))+
+  geom_hline(colour="purple",aes(yintercept=quantile(transaction_rate_day$n, c(0.975))))
+  
+```
+It seems like the transaction 
